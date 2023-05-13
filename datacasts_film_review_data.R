@@ -2,60 +2,81 @@ library(rvest)
 library(dplyr)
 library(stringr)
 
-url <- "https://www.theguardian.com/film/2023/apr/23/the-three-musketeers-dartagnan-eva-green-shines-as-milady-in-flamboyant-french-adaptation"
-
-html_content <- read_html(url)
-
-author <- html_content |> 
-  html_element("address a") |> 
-  html_text()
-
-review_title <- html_content |> 
-  html_element("div.dcr-1djovmt h1") |> 
-  html_text()
-
-film_title <- word(review_title, 1, sep = fixed(" – ")) |> 
-  str_remove(" review")
-
-standfirst <- html_content |> 
-  html_elements("div.dcr-1yi1cnj")
-
-review_summary <- standfirst |> 
-  html_element("p") |> 
-  html_text()
-
-stars <- standfirst |> 
-  html_elements("svg path") |> 
-  html_attr("fill")
-
-if(length(stars) == 0) {
-  stars <- html_content |> 
-    html_elements("figure div.dcr-15zexom svg path") |> 
-    html_attr("fill")
+get_review_data <- function(url) {
+  html_content <- read_html(url)
+  standfirst <- html_elements(html_content, "div.dcr-1yi1cnj")
+  
+  if_else(
+    length(html_elements(standfirst, "svg")) == 0,
+    stars <- get_stars(html_content, c("figure div.dcr-15zexom svg path", "fill")),
+    stars <- get_stars(standfirst, c("svg path", "fill"))
+  )
+  
+  data <- get_data_table(html_content, standfirst, url, stars) |> get_date()
+  
+  return(data)
 }
 
-stars_num <- length(stars[stars=="#121212"])
+get_text <- function(html_content, tags) {
+  text <- html_content |> 
+    html_element(tags) |> 
+    html_text()
+  
+  return(text)
+}
 
-review_body <- html_content |> 
-  html_elements("div#maincontent p") |> 
-  html_text() |> 
-  paste(collapse = "\n\n")
+get_texts <- function(html_content, tags) {
+  texts <- html_content |> 
+    html_elements(tags) |> 
+    html_text() |> 
+    paste(collapse = "\n\n")
+  
+  return(texts)
+}
 
-data <- tibble(
-  film_title = film_title,
-  review_title = review_title,
-  author = author,
-  review_url = url,
-  star_rating = stars_num,
-  review_summary = review_summary,
-  review_body = review_body
-)
+get_attributes <- function(html_content, tags) {
+  element_tags <- tags[[1]]
+  attribute_tags <- tags[[2]]
+  
+  attributes <- html_content |> 
+    html_elements(element_tags) |> 
+    html_attr(attribute_tags)
+  
+  return(attributes)
+}
 
-data_with_date <- data |> 
-  mutate(
-    year = word(url, 5, sep = fixed("/")),
-    month = word(url, 6, sep = fixed("/")),
-    day = word(url, 7, sep = fixed("/")),
-    date = as.Date(paste0(year, month, day), "%Y%b%d")
-  ) |> 
-  select(-c(year, month, day))
+get_data_table <- function(html_content, standfirst, url, stars) {
+  data_table <- tibble(
+    review_title = get_text(html_content, "div.dcr-1djovmt h1"),
+    film_title = word(review_title, 1, sep = fixed(" – ")) |> str_remove(" review"),
+    author = get_text(html_content, "address a"),
+    review_url = url,
+    star_rating = stars,
+    review_summary = get_text(standfirst, "p"),
+    review_body = get_texts(html_content, "div#maincontent p")
+  )
+  
+  return(data_table)
+}
+
+get_date <- function(data) {
+  data_with_date <- data |> 
+    mutate(
+      year = word(url, 5, sep = fixed("/")),
+      month = word(url, 6, sep = fixed("/")),
+      day = word(url, 7, sep = fixed("/")),
+      date = as.Date(paste0(year, month, day), "%Y%b%d")
+    ) |> 
+    select(-c(year, month, day))
+  
+  return(data_with_date)
+}
+
+get_stars <- function(html_content, tags) {
+  stars <- get_attributes(html_content, tags)
+  stars_num <- length(stars[stars=="#121212"])
+  
+  return(stars_num)
+}
+
+url <- "https://www.theguardian.com/film/2023/apr/23/the-three-musketeers-dartagnan-eva-green-shines-as-milady-in-flamboyant-french-adaptation"
