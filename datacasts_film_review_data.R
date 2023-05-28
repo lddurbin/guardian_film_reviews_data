@@ -1,9 +1,33 @@
 library(rvest)
 library(dplyr)
 library(stringr)
+library(polite)
+library(purrr)
 
-get_review_data <- function(url) {
-  html_content <- read_html(url)
+get_reviews <- function(pages = 1) {
+  session <- bow("https://www.theguardian.com/film+tone/reviews", force = TRUE)
+  review_links <- get_urls(session, pages)
+  
+  reviews_table <- map(review_links, ~get_review_data(session, .x)) |> 
+    list_rbind()
+  
+  return(reviews_table)
+}
+
+
+get_urls <- function(session, pages) {
+  responses <- map(pages, ~scrape(session, query = list(page = .x)))
+  tags <- c("a.u-faux-block-link__overlay", "href")
+  
+  review_urls <- map(responses, ~get_attributes(.x, tags)) |> reduce(c)
+  
+  return(review_urls)
+}
+
+
+get_review_data <- function(session, url) {
+  current_session <- nod(session, path = url)
+  html_content <- scrape(current_session)
   standfirst <- html_elements(html_content, "div.dcr-1yi1cnj")
   
   if_else(
@@ -62,9 +86,9 @@ get_data_table <- function(html_content, standfirst, url, stars) {
 get_date <- function(data) {
   data_with_date <- data |> 
     mutate(
-      year = word(url, 5, sep = fixed("/")),
-      month = word(url, 6, sep = fixed("/")),
-      day = word(url, 7, sep = fixed("/")),
+      year = word(review_url, 5, sep = fixed("/")),
+      month = word(review_url, 6, sep = fixed("/")),
+      day = word(review_url, 7, sep = fixed("/")),
       date = as.Date(paste0(year, month, day), "%Y%b%d")
     ) |> 
     select(-c(year, month, day))
@@ -78,5 +102,3 @@ get_stars <- function(html_content, tags) {
   
   return(stars_num)
 }
-
-url <- "https://www.theguardian.com/film/2023/apr/23/the-three-musketeers-dartagnan-eva-green-shines-as-milady-in-flamboyant-french-adaptation"
