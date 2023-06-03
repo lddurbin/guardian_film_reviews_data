@@ -3,8 +3,11 @@ library(dplyr)
 library(stringr)
 library(polite)
 library(purrr)
+library(cli)
 
 get_reviews <- function(pages = 1) {
+  initiation_message(pages)
+  
   session <- bow("https://www.theguardian.com/film+tone/reviews", force = TRUE)
   review_links <- get_urls(session, pages)
   
@@ -37,6 +40,8 @@ get_review_data <- function(session, url) {
   )
   
   data <- get_data_table(html_content, standfirst, url, stars) |> get_date()
+  
+  film_review_download_status_message(data)
   
   return(data)
 }
@@ -101,4 +106,32 @@ get_stars <- function(html_content, tags) {
   stars_num <- length(stars[stars=="#121212"])
   
   return(stars_num)
+}
+
+
+initiation_message <- function(pages) {
+  pages_num <- if_else(
+    length(pages) == 1,
+    "a page",
+    paste0(length(pages), " pages")
+  )
+  
+  message <- cli_alert(
+    "{.href [Politely](https://dmi3kno.github.io/polite/)} downloading {pages_num} of film reviews from {.href [The Guardian Film website](https://www.theguardian.com/uk/film)}."
+  )
+  
+  return(message)
+}
+
+
+film_review_download_status_message <- function(data) {
+  author <- data$author
+  url <- data$review_url
+  title <- data$film_title
+  
+  message <- cli_alert_success(
+    "Downloaded {author}'s review of {.href [{title}]({url})}."
+  )
+  
+  return(message)
 }
