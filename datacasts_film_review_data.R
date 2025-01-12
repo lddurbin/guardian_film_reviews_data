@@ -5,6 +5,13 @@ library(polite)
 library(purrr)
 library(cli)
 
+
+#' Fetch Reviews from The Guardian Film Website
+#'
+#' @param pages Numeric vector. The page numbers to fetch reviews from (e.g., 1:5 for pages 1 to 5).
+#' @return A tibble containing review details for films.
+#' @import polite rvest dplyr purrr cli
+#' @export
 get_reviews <- function(pages = 1) {
   initiation_message(pages)
   
@@ -18,6 +25,13 @@ get_reviews <- function(pages = 1) {
 }
 
 
+#' Get URLs of Reviews
+#'
+#' @param session A polite session object for the target website.
+#' @param pages Numeric vector. The page numbers to fetch review URLs from.
+#' @return A character vector of review URLs.
+#' @import polite rvest purrr
+#' @export
 get_urls <- function(session, pages) {
   responses <- map(pages, ~scrape(session, query = list(page = .x)))
   tags <- c("a.u-faux-block-link__overlay", "href")
@@ -28,6 +42,13 @@ get_urls <- function(session, pages) {
 }
 
 
+#' Fetch Data for a Single Review
+#'
+#' @param session A polite session object for the target website.
+#' @param url Character. The URL of a single review.
+#' @return A tibble containing details of the review.
+#' @import polite rvest dplyr cli
+#' @export
 get_review_data <- function(session, url) {
   current_session <- nod(session, path = url)
   html_content <- scrape(current_session)
@@ -46,6 +67,14 @@ get_review_data <- function(session, url) {
   return(data)
 }
 
+
+#' Extract Text from HTML
+#'
+#' @param html_content An HTML document object.
+#' @param tags Character. A CSS selector to identify the HTML element containing the text.
+#' @return A character string of extracted text.
+#' @import rvest
+#' @export
 get_text <- function(html_content, tags) {
   text <- html_content |> 
     html_element(tags) |> 
@@ -54,6 +83,14 @@ get_text <- function(html_content, tags) {
   return(text)
 }
 
+
+#' Extract Multiple Texts from HTML
+#'
+#' @param html_content An HTML document object.
+#' @param tags Character. A CSS selector to identify the HTML elements containing the text.
+#' @return A character string combining all extracted texts.
+#' @import rvest
+#' @export
 get_texts <- function(html_content, tags) {
   texts <- html_content |> 
     html_elements(tags) |> 
@@ -63,6 +100,15 @@ get_texts <- function(html_content, tags) {
   return(texts)
 }
 
+
+#' Extract Attributes from HTML Elements
+#'
+#' @param html_content An HTML document object.
+#' @param tags Character vector of length 2. The first element is a CSS selector for the element, 
+#' and the second is the attribute to extract.
+#' @return A character vector of extracted attribute values.
+#' @import rvest
+#' @export
 get_attributes <- function(html_content, tags) {
   element_tags <- tags[[1]]
   attribute_tags <- tags[[2]]
@@ -74,6 +120,16 @@ get_attributes <- function(html_content, tags) {
   return(attributes)
 }
 
+
+#' Create a Data Table for a Review
+#'
+#' @param html_content An HTML document object for the review page.
+#' @param standfirst An HTML node object for the standfirst section.
+#' @param url Character. The review URL.
+#' @param stars Numeric. The star rating for the film.
+#' @return A tibble containing review details.
+#' @import rvest dplyr
+#' @export
 get_data_table <- function(html_content, standfirst, url, stars) {
   data_table <- tibble(
     review_title = get_text(html_content, "div.dcr-1djovmt h1"),
@@ -88,6 +144,13 @@ get_data_table <- function(html_content, standfirst, url, stars) {
   return(data_table)
 }
 
+
+#' Add Date Columns to the Data Table
+#'
+#' @param data A tibble containing review details.
+#' @return A tibble with added date columns.
+#' @import dplyr
+#' @export
 get_date <- function(data) {
   data_with_date <- data |> 
     mutate(
@@ -101,6 +164,15 @@ get_date <- function(data) {
   return(data_with_date)
 }
 
+
+#' Extract Star Ratings from HTML
+#'
+#' @param html_content An HTML document object.
+#' @param tags Character vector of length 2. The first element is a CSS selector for the element,
+#' and the second is the attribute to extract.
+#' @return Numeric. The number of stars.
+#' @import rvest
+#' @export
 get_stars <- function(html_content, tags) {
   stars <- get_attributes(html_content, tags)
   stars_num <- length(stars[stars=="#121212"])
@@ -109,6 +181,12 @@ get_stars <- function(html_content, tags) {
 }
 
 
+#' Display an Initiation Message
+#'
+#' @param pages Numeric vector. The page numbers to fetch reviews from.
+#' @return None. Prints a message to the console.
+#' @import cli
+#' @export
 initiation_message <- function(pages) {
   pages_num <- if_else(
     length(pages) == 1,
@@ -124,6 +202,12 @@ initiation_message <- function(pages) {
 }
 
 
+#' Display Download Status Message for a Review
+#'
+#' @param data A tibble containing review details.
+#' @return None. Prints a message to the console.
+#' @import cli
+#' @export
 film_review_download_status_message <- function(data) {
   author <- data$author
   url <- data$review_url
